@@ -1,13 +1,41 @@
 'use strict'
 
 // CUSTOMIZE THESE VARIABLES
-const MASTER_MULTIADDR = "/ip4/190.198.70.169/tcp/4004/ws/ipfs/QmRFFTmLG6y8DkJKXQsh2JXtyLvwN5QUog1vZJPtrCddR3"
-const DB_ADDRESS = "/orbitdb/QmdSeUenVxgwsgbo3ZidV2oxW1RFr5XxGNfVtSRN4p4Eda/example5343234"
+const MASTER_MULTIADDR = "/ip4/190.198.70.169/tcp/5005/ws/p2p/QmZoF3Yf5fqtpTRjdggSaNHjZcUvjuHXdDHXDxaoACsJJt"
+const DB_ADDRESS = "/orbitdb/zdpuAyTCPbmFJAhXhCZ8kFpTTKj42W9RdqLH6mbdqEnyXQXxc/example5343234"
 
 const IPFS = require('ipfs')
 const OrbitDB = require('orbit-db')
 let userName = 'Node1';
 let aux = true;
+
+
+// Ipfs Options
+const ipfsOptions = {
+  repo: './orbitdb/examples/ipfs',
+  start: true,
+  EXPERIMENTAL: {
+    pubsub: true,
+  },
+  config: {
+    Addresses: {
+      Swarm: [
+        '/ip4/0.0.0.0/tcp/4004',
+        '/ip4/127.0.0.1/tcp/4005/ws'
+      ],
+      API: '/ip4/127.0.0.1/tcp/4006',
+      Gateway: '/ip4/127.0.0.1/tcp/4007',
+      Delegates: []
+    },
+  },
+  relay: {
+    enabled: true, // enable circuit relay dialer and listener
+    hop: {
+      enabled: true // enable circuit relay HOP (make this node a relay)
+    }
+  },
+  pubsub: true
+}
 
 const printChat = async (db) => {
   console.clear();
@@ -25,62 +53,37 @@ const printChat = async (db) => {
 
 }
 
-console.log("Starting...")
+// Start ipfs client node 
+const startClientNode = async () => {
 
-const ipfs = new IPFS({
-  repo: './orbitdb/examples/ipfs',
-  start: true,
-  EXPERIMENTAL: {
-    pubsub: true,
-  },
-  config: {
-    Addresses: {
-      Swarm: [
-        '/ip4/0.0.0.0/tcp/4008',
-        '/ip4/127.0.0.1/tcp/4008/ws'
-      ],
-      API: '/ip4/127.0.0.1/tcp/5008',
-      Gateway: '/ip4/127.0.0.1/tcp/9098',
-      Delegates: []
-    },
-  },
-  relay: {
-    enabled: true, // enable circuit relay dialer and listener
-    hop: {
-      enabled: true // enable circuit relay HOP (make this node a relay)
-    }
-  },
-  pubsub: true
-})
 
-ipfs.on('error', (err) => console.error(err))
+  // Starting ipfs node 
+  console.log("Starting...")
+  const ipfs = await IPFS.create(ipfsOptions)
 
-ipfs.on("replicated", () => {
-  console.log(`replication event fired`);
-})
-
-ipfs.on('ready', async () => {
+  console.log('... IPFS is ready.')
   let db
 
   await ipfs.swarm.connect(MASTER_MULTIADDR)
 
   try {
-    const orbitdb = new OrbitDB(ipfs, './orbitdb/examples/eventlog')
+    const orbitdb = await OrbitDB.createInstance(ipfs, { repo: './orbitdb/examples/eventlog' })
     db = await orbitdb.eventlog(DB_ADDRESS)
     await db.load()
     db.events.on('replicated', (MASTER_MULTIADDR) => {
-      if(!aux){ printChat(db);}
+      if (!aux) { printChat(db); }
     })
   } catch (e) {
     console.error(e)
     process.exit(1)
   }
+  console.log('1')
 
   // Get process.stdin as the standard input object.
   var standard_input = process.openStdin();
   process.stdin.setEncoding('utf8');
   console.log("\n")
-  console.log("--------------------\n") 
+  console.log("--------------------\n")
   console.log("Insert Username.");
 
   standard_input.on('data', (data) => {
@@ -112,4 +115,7 @@ ipfs.on('ready', async () => {
     }
 
   });
-})
+
+}
+
+startClientNode()
