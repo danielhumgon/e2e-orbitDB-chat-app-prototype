@@ -8,6 +8,34 @@ const OrbitDB = require('orbit-db')
 let userName = 'Node1';
 let aux = true;
 
+// Ipfs options
+const ipfsOptions = {
+  repo: './orbitdb/examples/ipfs',
+  start: true,
+  EXPERIMENTAL: {
+    pubsub: true,
+  },
+  config: {
+    Addresses: {
+      Swarm: [
+        '/ip4/0.0.0.0/tcp/5004',
+        '/ip4/190.198.70.169/tcp/5005/ws'
+      ],
+      API: '/ip4/190.198.70.169/tcp/5006',
+      Gateway: '/ip4/190.198.70.169/tcp/5007',
+      Delegates: []
+    },
+  },
+  relay: {
+    enabled: true, // enable circuit relay dialer and listener
+    hop: {
+      enabled: true // enable circuit relay HOP (make this node a relay)
+    }
+  },
+  pubsub: true
+}
+
+
 const printChat = async (db) => {
   console.clear();
   const latest = db.iterator({ limit: 6 }).collect()
@@ -23,40 +51,12 @@ const printChat = async (db) => {
   console.log(output)
 
 }
-console.log("Starting...")
-const ipfs = new IPFS({
-  repo: './orbitdb/examples/ipfs',
-  start: true,
-  EXPERIMENTAL: {
-    pubsub: true,
-  },
-  config: {
-    Addresses: {
-      Swarm: [
-        '/ip4/0.0.0.0/tcp/4004',
-        '/ip4/190.198.70.169/tcp/4004/ws'
-      ],
-      API: '/ip4/190.198.70.169/tcp/5004',
-      Gateway: '/ip4/190.198.70.169/tcp/9094',
-      Delegates: []
-    },
-  },
-  relay: {
-    enabled: true, // enable circuit relay dialer and listener
-    hop: {
-      enabled: true // enable circuit relay HOP (make this node a relay)
-    }
-  },
-  pubsub: true
-})
 
-ipfs.on('error', (err) => console.error(err))
+// Start ipfs server node
+const startMasterNode = async () => {
+  console.log("Starting...")
+  const ipfs = await IPFS.create(ipfsOptions)
 
-ipfs.on("replicated", () => {
-  console.log(`replication event fired`);
-})
-
-ipfs.on('ready', async () => {
   let db
   try {
     const access = {
@@ -64,12 +64,12 @@ ipfs.on('ready', async () => {
       write: ["*"]
     };
 
-    const orbitdb = new OrbitDB(ipfs, './orbitdb/examples/eventlog')
-    db = await orbitdb.eventlog(DB_NAME, access)
+    const orbitdb = await OrbitDB.createInstance(ipfs, { repo: './orbitdb/examples/eventlog' })
+    db = await orbitdb.eventlog(DB_NAME, { accessController: access })
     await db.load()
-    console.log(`db id: ${db.id}`)	
+    console.log(`db id: ${db.id}`)
     db.events.on('replicated', () => {
-      if(!aux){ printChat(db);}
+      if (!aux) { printChat(db); }
     })
   } catch (e) {
     console.error(e)
@@ -81,7 +81,7 @@ ipfs.on('ready', async () => {
   var standard_input = process.stdin;
   standard_input.setEncoding('utf-8');
   console.log("\n")
-  console.log("--------------------\n") 
+  console.log("--------------------\n")
   console.log("Insert Username.");
 
   var standard_input = process.stdin;
@@ -114,6 +114,11 @@ ipfs.on('ready', async () => {
     }
 
   });
+}
 
 
-})
+startMasterNode()
+
+
+
+
